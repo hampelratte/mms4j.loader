@@ -3,14 +3,14 @@
     <parent>
         <artifactId>master</artifactId>
         <groupId>org.hampelratte</groupId>
-        <version>1.0.0</version>
+        <version>2</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
-    <artifactId>mms4j</artifactId>
+    <artifactId>mms4j.loader</artifactId>
     <packaging>jar</packaging>
-    <version>1.2-SNAPSHOT</version>
-    <name>MMS4J</name>
-    <description>An implementation of the &quot;Microsoft Media Server&quot; protocol</description>
+    <version>1.0.0</version>
+    <name>Loader</name>
+    <description>An example application for mms4j, which saves a mms stream to disk</description>
     <url>http://developer.berlios.de/projects/vch</url>
 
     <properties>
@@ -19,9 +19,9 @@
 
     <dependencies>
         <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-            <version>1.5.6</version>
+            <groupId>org.hampelratte</groupId>
+            <artifactId>mms4j</artifactId>
+            <version>1.2-SNAPSHOT</version>
             <type>jar</type>
             <scope>compile</scope>
         </dependency>
@@ -31,12 +31,6 @@
             <version>1.5.6</version>
             <type>jar</type>
             <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.mina</groupId>
-            <artifactId>mina-core</artifactId>
-            <version>2.0.0-RC1</version>
-            <scope>compile</scope>
         </dependency>
     </dependencies>
 
@@ -57,22 +51,6 @@
                     <source>1.6</source>
                     <target>1.6</target>
                 </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-javadoc-plugin</artifactId>
-                <configuration>
-                    <quiet>true</quiet>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>javadoc-jar</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>jar</goal>
-                        </goals>
-                    </execution>
-                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

@@ -367,6 +367,7 @@ public class MainFrame extends JFrame implements ActionListener, MMSMessageListe
             progress.setString("Starting download");
             client.startStreaming(startPacket);
         } else if(command instanceof ReportEndOfStream) {
+            reset();
             setProgess(100);
             progress.setString("Finished");
             lThroughput.setText("");

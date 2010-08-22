@@ -22,12 +22,9 @@ import javax.swing.JPanel;
 import javax.swing.JProgressBar;
 import javax.swing.JTextField;
 
-import org.apache.mina.core.future.CloseFuture;
 import org.apache.mina.core.future.IoFuture;
 import org.apache.mina.core.future.IoFutureListener;
-import org.apache.mina.core.service.IoHandler;
 import org.apache.mina.core.service.IoHandlerAdapter;
-import org.apache.mina.core.session.IdleStatus;
 import org.apache.mina.core.session.IoSession;
 import org.hampelratte.net.mms.asf.io.ASFInputStream;
 import org.hampelratte.net.mms.asf.objects.ASFFilePropertiesObject;
@@ -54,7 +51,7 @@ import org.hampelratte.net.mms.messages.server.ReportStreamSwitch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class MainFrame extends JFrame implements ActionListener, MMSMessageListener, MMSPacketListener, IoHandler {
+public class MainFrame extends JFrame implements ActionListener, MMSMessageListener, MMSPacketListener {
 
     private static transient Logger logger = LoggerFactory.getLogger(MainFrame.class);
     
@@ -64,6 +61,7 @@ public class MainFrame extends JFrame implements ActionListener, MMSMessageListe
     private JButton bBrowse, bStart;
     private JProgressBar progress;
     
+    private boolean running = false;
     private long packetCount, packetReadCount;
     
     private MMSClient client;
@@ -177,29 +175,53 @@ public class MainFrame extends JFrame implements ActionListener, MMSMessageListe
                 tfDir.setText(jfc.getSelectedFile().getAbsolutePath());
             }
         } else if(e.getSource() == bStart) {
-            setUserInteractionEnabled(false);
-            
-            String uri = tfUrl.getText();
-            String dir = tfDir.getText();
-            logger.info("Trying to download {} to directory {}", uri, dir);
-            try {
-                startDownload(uri, dir);
-            } catch (FileNotFoundException exc) {
-                String msg = "Output directory does not exist";
-                logger.error(msg, exc);
-                progress.setString(msg);
-                setUserInteractionEnabled(true);
-            } catch (URISyntaxException exc) {
-                String msg = "Given URI is invalid";
-                logger.error(msg, exc);
-                progress.setString(msg);
-                setUserInteractionEnabled(true);
+            running = !running;
+            if(running) {
+                setUserInteractionEnabled(false);
+                
+                String uri = tfUrl.getText();
+                String dir = tfDir.getText();
+                logger.info("Trying to download {} to directory {}", uri, dir);
+                try {
+                    startDownload(uri, dir);
+                } catch (FileNotFoundException exc) {
+                    reset();
+                    String msg = "Output directory does not exist";
+                    logger.error(msg, exc);
+                    progress.setString(msg);
+                    running = false;
+                    setUserInteractionEnabled(true);
+                } catch (URISyntaxException exc) {
+                    reset();
+                    String msg = "Given URI is invalid";
+                    logger.error(msg, exc);
+                    progress.setString(msg);
+                    running = false;
+                    setUserInteractionEnabled(true);
+                } catch (Exception exc) {
+                    reset();
+                    logger.error("Unexpected error", exc);
+                    String msg = exc.getLocalizedMessage() != null ? exc.getLocalizedMessage() : exc.getClass().getSimpleName();
+                    progress.setString(msg);
+                    running = false;
+                    setUserInteractionEnabled(true);
+                }
+            } else {
+                client.disconnect(new IoFutureListener<IoFuture>() {
+                    @Override
+                    public void operationComplete(IoFuture arg0) {
+                        running = false;
+                        setUserInteractionEnabled(true);
+                        reset();
+                    }
+                });
             }
         }
     }
     
-    private void startDownload(String mmsUri, final String destDir) throws URISyntaxException, FileNotFoundException {
+    private void startDownload(String mmsUri, final String destDir) throws Exception {
         reset();
+        bStart.setText("Cancel");
         progress.setIndeterminate(true);
         progress.setString("Connecting to server");
         
@@ -251,12 +273,14 @@ public class MainFrame extends JFrame implements ActionListener, MMSMessageListe
         client.addMessageListener(this);
         client.addPacketListener(dumper);
         client.addPacketListener(this);
-        client.addAdditionalIoHandler(this);
-
         client.addAdditionalIoHandler(new IoHandlerAdapter() {
             @Override
             public void exceptionCaught(IoSession session, Throwable cause) throws Exception {
-                logger.error("Exception caught:", cause);
+                logger.error("An error occured", cause);
+                reset();
+                progress.setString(cause.getLocalizedMessage());
+                setUserInteractionEnabled(true);
+                running = false;
                 
                 if(cause.getCause() != null && cause.getCause() instanceof RemoteException) {
                     RemoteException re = (RemoteException) cause.getCause();
@@ -264,11 +288,10 @@ public class MainFrame extends JFrame implements ActionListener, MMSMessageListe
                     progress.setString(msg);
                 }
                 
-                CloseFuture cf = session.close(true);
-                cf.addListener(new IoFutureListener<IoFuture>() {
+                client.disconnect(new IoFutureListener<IoFuture>() {
                     @Override
-                    public void operationComplete(IoFuture future) {
-                        // TODO handle exception
+                    public void operationComplete(IoFuture arg0) {
+                        // nothing to do
                     }
                 });
             }
@@ -277,11 +300,7 @@ public class MainFrame extends JFrame implements ActionListener, MMSMessageListe
         // finally start the download, the negotiator
         // will start automatically when the connection is
         // established
-        try {
-            client.connect();
-        } catch (Exception e) {
-            logger.error("Couldn't connect to host " + host, e);
-        }
+        client.connect();
     }
 
     private void reset() {
@@ -291,13 +310,13 @@ public class MainFrame extends JFrame implements ActionListener, MMSMessageListe
         packetReadCount = 0;
         packetCount = 0;
         lThroughput.setText("");
+        bStart.setText("Download");
     }
     
     private void setUserInteractionEnabled(boolean enabled) {
         tfUrl.setEnabled(enabled);
         tfDir.setEnabled(enabled);
         bBrowse.setEnabled(enabled);
-        bStart.setEnabled(enabled);
     }
 
     @Override
@@ -326,12 +345,10 @@ public class MainFrame extends JFrame implements ActionListener, MMSMessageListe
             }
         } else if(mmspacket instanceof MMSMediaPacket) {
             packetReadCount++;
+            lThroughput.setText(df.format(client.getSpeed()) + " KiB/s");
             int p = (int) ((double)packetReadCount / (double)packetCount * 100);
-            if(p != progress.getValue()) {
-                setProgess(p);
-                lThroughput.setText(df.format(client.getSpeed()) + " KiB/s");
-                logger.info("{} / {} packets read", packetReadCount, packetCount);
-            }
+            setProgess(p);
+            logger.info("{} / {} packets read", packetReadCount, packetCount);
         }
     }
 
@@ -354,6 +371,7 @@ public class MainFrame extends JFrame implements ActionListener, MMSMessageListe
             progress.setString("Finished");
             lThroughput.setText("");
             setUserInteractionEnabled(true);
+            running = false;
             
             logger.info("Received end of stream. Closing connection.");
             client.disconnect(new IoFutureListener<IoFuture>() {
@@ -365,37 +383,5 @@ public class MainFrame extends JFrame implements ActionListener, MMSMessageListe
         } else {
             // here you may react on other messages
         }
-    }
-
-    @Override
-    public void exceptionCaught(IoSession arg0, Throwable arg1) throws Exception {
-        logger.error("An error occured", arg1);
-        progress.setString(arg1.getLocalizedMessage());
-        progress.setIndeterminate(false);
-        setUserInteractionEnabled(true);
-    }
-
-    @Override
-    public void messageReceived(IoSession arg0, Object arg1) throws Exception {
-    }
-
-    @Override
-    public void messageSent(IoSession arg0, Object arg1) throws Exception {
-    }
-
-    @Override
-    public void sessionClosed(IoSession arg0) throws Exception {
-    }
-
-    @Override
-    public void sessionCreated(IoSession arg0) throws Exception {
-    }
-
-    @Override
-    public void sessionIdle(IoSession arg0, IdleStatus arg1) throws Exception {
-    }
-
-    @Override
-    public void sessionOpened(IoSession arg0) throws Exception {
     }
 }

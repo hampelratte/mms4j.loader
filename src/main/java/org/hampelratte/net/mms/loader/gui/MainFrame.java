@@ -25,7 +25,9 @@ import javax.swing.JTextField;
 import org.apache.mina.core.future.CloseFuture;
 import org.apache.mina.core.future.IoFuture;
 import org.apache.mina.core.future.IoFutureListener;
+import org.apache.mina.core.service.IoHandler;
 import org.apache.mina.core.service.IoHandlerAdapter;
+import org.apache.mina.core.session.IdleStatus;
 import org.apache.mina.core.session.IoSession;
 import org.hampelratte.net.mms.asf.io.ASFInputStream;
 import org.hampelratte.net.mms.asf.objects.ASFFilePropertiesObject;
@@ -52,7 +54,7 @@ import org.hampelratte.net.mms.messages.server.ReportStreamSwitch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class MainFrame extends JFrame implements ActionListener, MMSMessageListener, MMSPacketListener {
+public class MainFrame extends JFrame implements ActionListener, MMSMessageListener, MMSPacketListener, IoHandler {
 
     private static transient Logger logger = LoggerFactory.getLogger(MainFrame.class);
     
@@ -175,15 +177,23 @@ public class MainFrame extends JFrame implements ActionListener, MMSMessageListe
                 tfDir.setText(jfc.getSelectedFile().getAbsolutePath());
             }
         } else if(e.getSource() == bStart) {
+            setUserInteractionEnabled(false);
+            
             String uri = tfUrl.getText();
             String dir = tfDir.getText();
             logger.info("Trying to download {} to directory {}", uri, dir);
             try {
                 startDownload(uri, dir);
             } catch (FileNotFoundException exc) {
-                logger.error("Output directory does not exist", exc);
+                String msg = "Output directory does not exist";
+                logger.error(msg, exc);
+                progress.setString(msg);
+                setUserInteractionEnabled(true);
             } catch (URISyntaxException exc) {
-                logger.error("Given URI is invalid", exc);
+                String msg = "Given URI is invalid";
+                logger.error(msg, exc);
+                progress.setString(msg);
+                setUserInteractionEnabled(true);
             }
         }
     }
@@ -239,6 +249,7 @@ public class MainFrame extends JFrame implements ActionListener, MMSMessageListe
         client.addMessageListener(this);
         client.addPacketListener(dumper);
         client.addPacketListener(this);
+        client.addAdditionalIoHandler(this);
 
         client.addAdditionalIoHandler(new IoHandlerAdapter() {
             @Override
@@ -277,6 +288,13 @@ public class MainFrame extends JFrame implements ActionListener, MMSMessageListe
         packetReadCount = 0;
         packetCount = 0;
         lThroughput.setText("");
+    }
+    
+    private void setUserInteractionEnabled(boolean enabled) {
+        tfUrl.setEnabled(enabled);
+        tfDir.setEnabled(enabled);
+        bBrowse.setEnabled(enabled);
+        bStart.setEnabled(enabled);
     }
 
     @Override
@@ -330,6 +348,7 @@ public class MainFrame extends JFrame implements ActionListener, MMSMessageListe
             setProgess(100);
             progress.setString("Finished");
             lThroughput.setText("");
+            setUserInteractionEnabled(true);
             
             logger.info("Received end of stream. Closing connection.");
             client.disconnect(new IoFutureListener<IoFuture>() {
@@ -341,5 +360,36 @@ public class MainFrame extends JFrame implements ActionListener, MMSMessageListe
         } else {
             // here you may react on other messages
         }
+    }
+
+    @Override
+    public void exceptionCaught(IoSession arg0, Throwable arg1) throws Exception {
+        logger.error("An error occured", arg1);
+        progress.setString(arg1.getLocalizedMessage());
+        setUserInteractionEnabled(true);
+    }
+
+    @Override
+    public void messageReceived(IoSession arg0, Object arg1) throws Exception {
+    }
+
+    @Override
+    public void messageSent(IoSession arg0, Object arg1) throws Exception {
+    }
+
+    @Override
+    public void sessionClosed(IoSession arg0) throws Exception {
+    }
+
+    @Override
+    public void sessionCreated(IoSession arg0) throws Exception {
+    }
+
+    @Override
+    public void sessionIdle(IoSession arg0, IdleStatus arg1) throws Exception {
+    }
+
+    @Override
+    public void sessionOpened(IoSession arg0) throws Exception {
     }
 }

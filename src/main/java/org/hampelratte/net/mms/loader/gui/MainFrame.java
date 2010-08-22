@@ -200,6 +200,8 @@ public class MainFrame extends JFrame implements ActionListener, MMSMessageListe
     
     private void startDownload(String mmsUri, final String destDir) throws URISyntaxException, FileNotFoundException {
         reset();
+        progress.setIndeterminate(true);
+        progress.setString("Connecting to server");
         
         URI uri = new URI(mmsUri);
         String host = uri.getHost();
@@ -285,6 +287,7 @@ public class MainFrame extends JFrame implements ActionListener, MMSMessageListe
     private void reset() {
         setProgess(0);
         progress.setString("");
+        progress.setIndeterminate(false);
         packetReadCount = 0;
         packetCount = 0;
         lThroughput.setText("");
@@ -311,6 +314,7 @@ public class MainFrame extends JFrame implements ActionListener, MMSMessageListe
                     ASFFilePropertiesObject fileprops = (ASFFilePropertiesObject) asfHeader.getNestedHeader(ASFFilePropertiesObject.class);
                     if(fileprops != null) {
                         packetCount = fileprops.getDataPacketCount();
+                        progress.setIndeterminate(false);
                         logger.info("Stream consists of {} packets", packetCount);
                         logger.debug("File properties {}", fileprops.toString());
                     } else {
@@ -343,6 +347,7 @@ public class MainFrame extends JFrame implements ActionListener, MMSMessageListe
             long startPacket = 0;
 
             // start the streaming
+            progress.setString("Starting download");
             client.startStreaming(startPacket);
         } else if(command instanceof ReportEndOfStream) {
             setProgess(100);
@@ -366,6 +371,7 @@ public class MainFrame extends JFrame implements ActionListener, MMSMessageListe
     public void exceptionCaught(IoSession arg0, Throwable arg1) throws Exception {
         logger.error("An error occured", arg1);
         progress.setString(arg1.getLocalizedMessage());
+        progress.setIndeterminate(false);
         setUserInteractionEnabled(true);
     }
 

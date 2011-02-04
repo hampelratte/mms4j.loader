@@ -3,12 +3,12 @@
     <parent>
         <artifactId>master</artifactId>
         <groupId>org.hampelratte</groupId>
-        <version>2</version>
+        <version>3</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <artifactId>mms4j.loader</artifactId>
     <packaging>jar</packaging>
-    <version>1.0.0</version>
+    <version>1.0.1-SNAPSHOT</version>
     <name>Loader</name>
     <description>An example application for mms4j, which saves a mms stream to disk</description>
     <url>http://developer.berlios.de/projects/vch</url>
